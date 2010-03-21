@@ -24,8 +24,8 @@ Library
                     random ==1.0.*,
                     time ==1.1.*,
                     utf8-string ==0.3.*,
-                    salvia ==0.3.*,
-                    salvia-protocol ==0.1.*,
+                    salvia ==1.0.*,
+                    salvia-protocol ==1.0.*,
                     monads-fd ==0.0.*
 
   Exposed-modules:  Network.Salvia.Handler.Login
