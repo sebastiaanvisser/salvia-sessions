@@ -1,5 +1,7 @@
 {-# LANGUAGE
     FlexibleContexts
+  , FlexibleInstances
+  , UndecidableInstances
   , TemplateHaskell
   , ScopedTypeVariables
   , TypeOperators
@@ -53,6 +55,7 @@ module Network.Salvia.Handler.Login
 where
 
 import Control.Applicative
+import Control.Concurrent.STM
 import Control.Monad.State hiding (get)
 import Data.ByteString.Lazy.UTF8 hiding (lines)
 import Data.Digest.Pure.MD5
@@ -61,9 +64,10 @@ import Data.Maybe
 import Data.Record.Label
 import Network.Protocol.Http
 import Network.Protocol.Uri
-import Network.Salvia.Interface
 import Network.Salvia.Handler.Body
 import Network.Salvia.Handler.Session
+import Network.Salvia.Impl.Handler
+import Network.Salvia.Interface
 import Prelude hiding (mod)
 import Safe
 import qualified Control.Monad.State as S
@@ -133,6 +137,15 @@ class (Applicative m, Monad m) => LoginM p m | m -> p where
   logout     ::                                          m ()
   signup     :: [Action]      -> m a -> (User -> m a) -> m a
   authorized :: Maybe Action  -> m a -> (User -> m a) -> m a
+
+instance ( Contains q (TVar (Sessions (UserPayload p)))
+         , Contains q (TVar UserDatabase)
+         ) => LoginM p (Handler q) where
+  login      = hLogin      (undefined :: p)
+  logout     = hLogout     (undefined :: p)
+  loginfo    = hLoginfo    (undefined :: p)
+  signup     = hSignup     (undefined :: p)
+  authorized = hAuthorized (undefined :: p)
 
 hGetUser :: LoginM p m => m (Maybe User)
 hGetUser = authorized Nothing (return Nothing) (return . Just)

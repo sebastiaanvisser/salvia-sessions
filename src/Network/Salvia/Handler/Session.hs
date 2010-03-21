@@ -1,5 +1,7 @@
 {-# LANGUAGE
     FlexibleContexts
+  , FlexibleInstances
+  , UndecidableInstances
   , TemplateHaskell
   , TypeOperators
   , ScopedTypeVariables
@@ -12,8 +14,8 @@ module Network.Salvia.Handler.Session where
 import Control.Applicative hiding (empty)
 import Control.Category
 import Control.Concurrent.STM hiding (check)
-import Control.Monad.State hiding (get, sequence)
 import Control.Monad.Maybe
+import Control.Monad.State hiding (get, sequence)
 import Data.List
 import Data.Maybe
 import Data.Record.Label
@@ -21,8 +23,9 @@ import Data.Time.Clock
 import Data.Time.LocalTime
 import Network.Protocol.Cookie hiding (empty)
 import Network.Protocol.Http hiding (cookie)
-import Network.Salvia.Interface
 import Network.Salvia.Handler.Cookie
+import Network.Salvia.Impl.Handler
+import Network.Salvia.Interface
 import Prelude hiding ((.), id, lookup, sequence, mod)
 import Safe
 import System.Random
@@ -77,6 +80,15 @@ class (Applicative m, Monad m) => SessionM p m | m -> p where
   putSession     :: Session p -> m ()
   delSession     :: m ()
   withSession    :: (Session p -> Session p) -> m ()
+
+-- | Default instance for the `Handler' context.
+
+instance Contains q (TVar (Sessions p)) => SessionM p (Handler q) where
+  prolongSession = hProlongSession (undefined :: p)
+  getSession     = hGetSession
+  putSession     = hPutSession
+  delSession     = hDelSession     (undefined :: p)
+  withSession    = hWithSession
 
 -- | A mapping from unique session IDs to shared session variables.
 
