@@ -56,7 +56,7 @@ where
 
 import Control.Applicative
 import Control.Concurrent.STM
-import Control.Monad.State hiding (get)
+import Control.Monad.State
 import Data.ByteString.Lazy.UTF8 hiding (lines)
 import Data.Digest.Pure.MD5
 import Data.List
@@ -70,7 +70,6 @@ import Network.Salvia.Impl.Handler
 import Network.Salvia.Interface
 import Prelude hiding (mod)
 import Safe
-import qualified Control.Monad.State as S
 
 {- |
 User containg a username, password and a list of actions this user is allowed
@@ -89,7 +88,7 @@ data User = User
   , _actions  :: [Action]
   } deriving (Eq, Show)
 
-$(mkLabels [''User])
+$(mkLabelsNoTypes [''User])
 
 username :: User :-> Username
 email    :: User :-> Email
@@ -126,7 +125,7 @@ data UserDatabase = UserDatabase
   , _users   :: [User]
   }
 
-$(mkLabels [''UserDatabase])
+$(mkLabelsNoTypes [''UserDatabase])
 
 users   :: UserDatabase :-> [User]
 backend :: UserDatabase :-> Backend
@@ -165,13 +164,13 @@ hSignup
 hSignup _ acts onFail onOk =
   do ps <- hRequestParameters "utf-8"
      join . payload $
-       do db <- S.get
-          case freshUserInfo ps (get users db) acts of
+       do db <- get
+          case freshUserInfo ps (getL users db) acts of
             Nothing -> return onFail
             Just user  -> 
               do modM users (user:)
                  return $
-                   do add (get backend db) user
+                   do add (getL backend db) user
                       onOk user
 
 -- | Helper functions that generates fresh user information.
@@ -183,8 +182,8 @@ freshUserInfo ps us acts =
      pass  <- "password" `lookup` ps >>= id
      if null user || null mail || null pass
        then Nothing
-       else case ( headMay $ filter ((==user) . get username) us
-                 , headMay $ filter ((==mail) . get email)   us
+       else case ( headMay $ filter ((==user) . getL username) us
+                 , headMay $ filter ((==mail) . getL email)   us
                  ) of
               (Nothing, Nothing) -> return $ User user mail (show (md5 (fromString pass))) acts
               _                  -> Nothing
@@ -202,11 +201,11 @@ hLogin
   => p -> m a -> (User -> m a) -> m a
 hLogin _ onFail onOk =
   do ps <- hRequestParameters "utf-8"
-     db <- payload S.get :: m UserDatabase
+     db <- payload get :: m UserDatabase
      case authenticate ps db of
        Nothing   -> onFail
        Just user -> do let pl = Just (UserPayload user True Nothing)
-                       withSession (set sPayload pl)
+                       withSession (setL sPayload pl)
                        onOk user
 
 -- | Helper functions that performs the authentication check.
@@ -215,14 +214,14 @@ authenticate :: Parameters -> UserDatabase -> Maybe User
 authenticate ps db =
   do user <- "username" `lookup` ps >>= id
      pass <- "password" `lookup` ps >>= id
-     case headMay $ filter ((==user) . get username) (get users db) of
-       Just u | get password u == show (md5 (fromString pass)) -> Just u
-       _                                                       -> Nothing
+     case headMay $ filter ((==user) . getL username) (getL users db) of
+       Just u | getL password u == show (md5 (fromString pass)) -> Just u
+       _                                                        -> Nothing
 
 -- | Logout the current user by emptying the session payload.
 
 hLogout :: SessionM (UserPayload p) m => p -> m ()
-hLogout _ = withSession (set sPayload Nothing)
+hLogout _ = withSession (setL sPayload Nothing)
 
 {- |
 The `loginfo' handler exposes the current user session to the world using a
@@ -235,7 +234,7 @@ hLoginfo :: (SessionM (UserPayload p) m, SendM m) => p -> m ()
 hLoginfo _ =
   do hSessionInfo
      s <- getSession
-     case get sPayload s of
+     case getL sPayload s of
        Nothing -> return ()
        Just (UserPayload (User uname mail _ acts) _ _) ->
          do send $ "\n" ++ intercalate "\n"
@@ -255,10 +254,10 @@ which may access the current user object.
 hAuthorized :: SessionM (UserPayload p) m => p -> Maybe Action -> m b -> (User -> m b) -> m b
 hAuthorized _ maction onFail onOk =
   do session <- getSession
-     case (maction, get sPayload session) of
-       (Nothing,     Just (UserPayload user _ _))                                  -> onOk user
-       (Just action, Just (UserPayload user _ _)) | action `elem` get actions user -> onOk user
-       _                                                                           -> onFail
+     case (maction, getL sPayload session) of
+       (Nothing,     Just (UserPayload user _ _))                                   -> onOk user
+       (Just action, Just (UserPayload user _ _)) | action `elem` getL actions user -> onOk user
+       _                                                                            -> onFail
 
 -- | User database backend that does nothing and discards all changes made.
 
@@ -280,8 +279,8 @@ fileBackend file = bcknd
         (_, user:mail:pass:acts) -> Just (User user mail pass acts)
         _                        -> Nothing
     printUserLine u = intercalate " " $
-      [ get username u
-      , get email u
-      , get password u
-      ] ++ get actions u ++ ["\n"]
+      [ getL username u
+      , getL email u
+      , getL password u
+      ] ++ getL actions u ++ ["\n"]
 
