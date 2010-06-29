@@ -14,7 +14,7 @@ module Network.Salvia.Handler.Session where
 import Control.Applicative hiding (empty)
 import Control.Category
 import Control.Concurrent.STM hiding (check)
-import Control.Monad.Maybe
+import Control.Monad.Trans.Maybe
 import Control.Monad.State hiding (sequence)
 import Data.List
 import Data.Maybe
@@ -167,10 +167,19 @@ session is updated.
 -}
 
 existingSessionVarOrNew
-  :: (Applicative m, MonadIO m, HttpM Request m, PayloadM q (Sessions p) m)
+  :: (PayloadM q (Sessions p) m, HttpM Request m, MonadIO m)
   => m (TVar (Session p))
-existingSessionVarOrNew = fromMaybeTM newSessionVar $
-  do sd  <- MaybeT getCookieSessionID
+existingSessionVarOrNew =
+  do ms <- existingSessionVar
+     case ms of
+       Nothing -> newSessionVar
+       Just s  -> return s
+
+existingSessionVar
+  :: (MonadIO m, HttpM Request m, PayloadM q (Sessions p) m)
+  => m (Maybe (TVar (Session p)))
+existingSessionVar = runMaybeT $
+  do sd   <- MaybeT getCookieSessionID
      svar <- MaybeT (lookupSessionVar sd)
      MaybeT (whenNotExpired svar)
 
@@ -178,7 +187,7 @@ whenNotExpired :: MonadIO m => TVar (Session p) -> m (Maybe (TVar (Session p)))
 whenNotExpired var =
   do n <- liftIO getCurrentTime
      session <- getVar var
-     return $ if (willExpireAt session > n) then Just var else Nothing
+     return $ if willExpireAt session > n then Just var else Nothing
 
 {- |
 This handler sets the HTTP cookie for the specified session. It will

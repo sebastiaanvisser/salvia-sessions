@@ -20,13 +20,13 @@ Library
                     pureMD5 ==1.0.*,
                     stm ==2.1.*,
                     containers >= 0.2 && < 0.4,
-                    MaybeT-transformers == 0.1.*,
                     random ==1.0.*,
                     time ==1.1.*,
                     utf8-string ==0.3.*,
                     salvia ==1.2.*,
                     salvia-protocol ==1.1.*,
-                    monads-fd ==0.0.*
+                    transformers < 0.3,
+                    monads-fd < 0.2
 
   Exposed-modules:  Network.Salvia.Handler.Login
                     Network.Salvia.Handler.Session
