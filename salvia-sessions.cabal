@@ -16,7 +16,7 @@ Library
 
   Build-Depends:    base ==4.*,
                     safe ==0.2.*,
-                    fclabels ==1.0.*,
+                    fclabels ==0.9.*,
                     pureMD5 ==1.0.*,
                     stm ==2.1.*,
                     containers >= 0.2 && < 0.4,
